@@ -2,8 +2,20 @@
  openimis-be-import-export
 
 
-Task:
 
+## Process:
+
+pre-import 
+1- validate data
+2- inject location id
+
+for each insuree
+1- check if head (no head insuree number)
+2- if not head add family id
+3- create instance
+4- if head, create family
+
+## annex
 
 fields
 ------

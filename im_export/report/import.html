@@ -1,0 +1,23 @@
+<div class="container-fluid">
+    {%if form %}
+        <form method="post" enctype="multipart/form-data" >
+            <ul class="list-inline text-right">
+                <li class="list-inline-item">
+                    <input type="submit" class="btn-primary btn" value="Import">
+                </li>
+            </ul>
+            <div class="bg-white p-2">
+                {%csrf_token%}
+                {%for field in form%}
+                    {%if field.field.widget.input_type == 'file'%}
+                        <div class="form-group mb-0 files">
+                            {{field}}
+                        </div>
+                    {%else%}
+                        {{field}}
+                    {%endif%}
+                {%endfor%}
+            </div>
+        </form>
+    {%endif%}
+   </div>
