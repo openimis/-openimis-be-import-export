@@ -1,8 +1,7 @@
-import collections
-
 from django.contrib.auth.models import User
 from django.db.models import Q
-from insuree.models import Family, Gender, Insuree
+from insuree.models import Insuree
+from insuree.service import FamilyService
 from location.models import Location
 
 from im_export import fields, resources, widgets
@@ -42,8 +41,8 @@ def get_uniq(elm_list):
     return [x for x in elm_list_stripped if x not in seen and not seen.add(x)]
 
 def insuree_number_uniqueness(dataset): 
-    uniq = get_uniq(dataset['insuree number'])
-    if len(uniq) != len(dataset['insuree number']):
+    uniq = get_uniq(dataset['insuree_number'])
+    if len(uniq) != len(dataset['insuree_number']):
         raise ValueError("there is duplicates insurance number in the list")
     
 def validate_location_inject_id(dataset):
@@ -90,7 +89,7 @@ def validate_location_inject_id(dataset):
                     region,
                     district,
                     municipality
-                ))
+               ))
         uniq_village = village+uniq_municipality
         if uniq_village not in village_seen:
             village_seen.add(uniq_village)
@@ -114,6 +113,8 @@ def validate_location_inject_id(dataset):
 class InsureeResource(resources.ModelResource):
     # model should enable to add a family and insuree
     # https://django-import-export.readthedocs.io/en/latest/import_workflow.html
+    families = {}
+    
     current_village = fields.Field(
         column_name='village', 
         attribute='current_village', 
@@ -128,31 +129,35 @@ class InsureeResource(resources.ModelResource):
         # look for duplicates within the list
         insuree_number_uniqueness(dataset)
         # sort the empty head first
-        dataset.sort(key=lambda a: a['head insuree number'])
+        dataset.sort(key=lambda a: a['head_insuree_number'])
         # validate the location and replace rteference with location id
         validate_location_inject_id(dataset)
 
         return dataset
      
     def before_import_row(row, row_number=None, **kwargs):
-        # set is head if no head insuree number
+        # set is head if no head_insuree_number
+     if row['head_insuree_number'] is None:
+        row['head'] = True
+        row['family'] = None
+     else:
+        row['head'] = False
+        # get head
+        head = Insuree.all().filter(validity_to__isnull=True).get(chf_id=row['head_insuree_number'])
+        row['family'] = head.family_id
         # set family id if not head
-        pass
+        
 
     
     def after_import_instance(instance, new, row_number=None, **kwargs):
         # if head create family
         if instance.is_head:
             #create family
+            data = {'head_insuree':instance.chf_id,'location': instance.current_village}
+            instance.family = FamilyService.create_or_update(data)
             #update family id
-            
-            pass
-        
-    
-
-
-    fields = ('family', 'chf_id','last_name','other_names','gender', 'dob','head',\
-        'marital','passport', 'phone', 'current_address','current_village','photo')
+            instance.save()
+   
     
     class Meta:
         model = Insuree    
