@@ -4,8 +4,8 @@ from resource import InsureeResource
 from core.services import (create_or_update_core_user,
                            create_or_update_interactive_user)
 from django.test import TestCase
+from insuree.models import Family, Insuree
 from location.test_helpers import create_test_location
-from insuree.models import Insuree, Family
 
 _TEST_USER_NAME = "test_insuree_import"
 _TEST_USER_PWD = "test_insuree_import"
