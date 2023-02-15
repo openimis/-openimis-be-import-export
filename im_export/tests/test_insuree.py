@@ -35,10 +35,6 @@ _TEST_LOCATIONS = [
 
 
 class ImportInsureeTest(TestCase):
-    regions = {}
-    districts = {}
-    municipalities = {}
-    villages = []
 
     def setUp(self) -> None:
 
@@ -51,33 +47,13 @@ class ImportInsureeTest(TestCase):
         test_location = _TEST_LOCATIONS
 
         for locations in test_location:
-            # create the region (must be unique name)
-            if locations['region'] not in self.regions:
-                test_region = create_test_location('R', custom_props={"name": locations['region']})
-                self.regions[locations['region']] = test_region
-            else:
-                test_region = self.regions[locations['region']]
-
-            # create the child district (must be unique name across district)    
-            if locations['district'] not in self.districts:
-                test_district = create_test_location('D', custom_props={"name": locations['district'],
-                                                                        "parent_id": test_region.id})
-                self.districts[locations['district']] = test_district
-            else:
-                test_district = self.districts[locations['district']]
-
-                # create the child municipalities (must be unique name across municipalities)
-            if locations['municipality'] not in self.municipalities:
-                test_municipality = create_test_location('M', custom_props={"name": locations['municipality'],
-                                                                            "parent_id": test_district.id})
-                self.municipalities[locations['municipality']] = test_municipality
-            else:
-                test_municipality = self.municipalities[locations['municipality']]
-
-                # create the child municipalities: can have same name in other municipalities
+            test_region = create_test_location('R', custom_props={"name": locations['region']})
+            test_district = create_test_location('D', custom_props={"name": locations['district'],
+                                                                    "parent_id": test_region.id})
+            test_municipality = create_test_location('M', custom_props={"name": locations['municipality'],
+                                                                        "parent_id": test_district.id})
             for villages in locations['villages']:
-                village = create_test_location('V', custom_props={"name": villages, "parent_id": test_municipality.id})
-                self.villages.append(village)
+                create_test_location('V', custom_props={"name": villages, "parent_id": test_municipality.id})
 
     def test_simple_import(self):
         dir_path = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
