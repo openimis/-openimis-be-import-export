@@ -1,14 +1,13 @@
 from django.db.models import Q
 
-from core.models import InteractiveUser
+from core.datetimes.ad_datetime import datetime
+from im_export.apps import ImportExportConfig
 from insuree.models import Insuree, Family, Gender
-from insuree.services import FamilyService
 from location.models import Location
 
 from import_export import fields, resources, widgets
 
 
-# https://django-import-export.readthedocs.io/en/latest/api_widgets.html
 class CharRequiredWidget(widgets.CharWidget):
     def clean(self, value, row=None, *args, **kwargs):
         val = super().clean(value)
@@ -21,94 +20,114 @@ class CharRequiredWidget(widgets.CharWidget):
 class ForeignkeyRequiredWidget(widgets.ForeignKeyWidget):
     def clean(self, value, row=None, *args, **kwargs):
         if value:
-            print(self.field, value)
             return self.get_queryset(value, row, *args, **kwargs).get(**{self.field: value})
         else:
             raise ValueError(self.field + ' required')
-
-
-def remove_empty_lines(dataset):
-    indexes = []
-    for i in range(0, len(dataset)):
-        row = ''.join(dataset[i])
-        if row.strip() == '':
-            indexes.append(i)
-    for index in sorted(indexes, reverse=True):
-        del dataset[index]
-
-
-def get_uniq(elm_list):
-    elm_list_stripped = [d.strip() for d in elm_list]
-    seen = set()
-    # count unique insurance number
-    return [x for x in elm_list_stripped if x not in seen and not seen.add(x)]
-
-
-def insuree_number_uniqueness(dataset):
-    uniq = get_uniq(dataset['insuree_number'])
-    if len(uniq) != len(dataset['insuree_number']):
-        raise ValueError('There are duplicates of insurance number in the list')
 
 
 def get_location_str_filter(str):
     return Q(code=str) | Q(name=str)  # | Q(uuid=str) | Q(id=int(str) if str.isdigit() else None)
 
 
-def validate_location_inject_id(dataset):
-    # change the region name/code/id/uuid into id.
+def get_locations_ids(row, regions, districts, municipalities, villages):
+    uniq_region = row['region'].strip()
+    if uniq_region not in regions:
+        region_model = Location.objects.all().filter(validity_to__isnull=True) \
+            .filter(get_location_str_filter(uniq_region)).first()
+        if region_model:
+            regions[uniq_region] = region_model.id
+        else:
+            raise ValueError('Location {} not found in the database'.format(uniq_region))
+
+    district = row['district'].strip()
+    uniq_district = uniq_region + "|" + district
+    if uniq_district not in districts:
+        district_model = Location.objects.all() \
+            .filter(validity_to__isnull=True, parent__id=regions[uniq_region]) \
+            .filter(get_location_str_filter(district)).first()
+        if district_model:
+            districts[uniq_district] = district_model.id
+        else:
+            raise ValueError('Location {} not found in the database'.format(uniq_district))
+
+    municipality = row['municipality'].strip()
+    uniq_municipality = uniq_district + "|" + municipality
+    if uniq_municipality not in municipalities:
+        municipality_model = Location.objects.all() \
+            .filter(validity_to__isnull=True, parent__id=districts[uniq_district]) \
+            .filter(get_location_str_filter(municipality)).first()
+        if municipality_model:
+            municipalities[uniq_municipality] = municipality_model.id
+        else:
+            raise ValueError('Location {} not found in the database'.format(uniq_municipality))
+
+    village = row['village'].strip()
+    uniq_village = uniq_municipality + "|" + village
+    if uniq_village not in villages:
+        village_model = Location.objects.all() \
+            .filter(validity_to__isnull=True, parent__id=municipalities[uniq_municipality]) \
+            .filter(get_location_str_filter(village)).first()
+        if village_model:
+            villages[uniq_village] = village_model.id
+        else:
+            raise ValueError('Location {} not found in the database'.format(uniq_village))
+
+    return regions[uniq_region], districts[uniq_district], municipalities[uniq_municipality], villages[uniq_village]
+
+
+def validate_and_preprocess(dataset):
+    # change the region names/codes into id.
     # a village can have homonyms therefore the parent must be taken into account
-    regions = {}
-    districts = {}
-    municipalities = {}
-    villages = {}
+    # check if head insuree
+    # check if insuree number is unique
+    regions = dict()
+    districts = dict()
+    municipalities = dict()
+    villages = dict()
+
+    regions_ids = list()
+    districts_ids = list()
+    municipalities_ids = list()
+    villages_ids = list()
+    head = list()
+    empty_indices = list()
+
+    insuree_no_seen = set()
 
     for idx, row in enumerate(dataset.dict):
-        uniq_region = row['region'].strip()
-        if uniq_region not in regions:
-            region_model = Location.objects.all().filter(validity_to__isnull=True).filter(
-                get_location_str_filter(uniq_region)).first()
-            if region_model:
-                regions[uniq_region] = region_model.id
-            else:
-                raise ValueError('Location {} not found in the database'.format(uniq_region))
 
-        district = row['district'].strip()
-        uniq_district = uniq_region + "|" + district
-        if uniq_district not in districts:
-            district_model = Location.objects.all().filter(validity_to__isnull=True,
-                                                           parent__id=regions[uniq_region]).filter(
-                get_location_str_filter(district)).first()
-            if district_model:
-                districts[uniq_district] = district_model.id
-            else:
-                raise ValueError('Location {} not found in the database'.format(uniq_district))
+        row_str = ''.join(dataset[idx])
+        if row_str.strip() == '':
+            empty_indices.append(idx)
+        else:
+            # Check locations
+            region_id, district_id, municipality_id, village_id = \
+                get_locations_ids(row, regions, districts, municipalities, villages)
+            regions_ids.append(region_id)
+            districts_ids.append(district_id)
+            municipalities_ids.append(municipality_id)
+            villages_ids.append(village_id)
 
-        municipality = row['municipality'].strip()
-        uniq_municipality = uniq_district + "|" + municipality
-        if uniq_municipality not in municipalities:
-            municipality_model = Location.objects.all().filter(validity_to__isnull=True,
-                                                               parent__id=districts[uniq_district]).filter(
-                get_location_str_filter(municipality)).first()
-            if municipality_model:
-                municipalities[uniq_municipality] = municipality_model.id
-            else:
-                raise ValueError('Location {} not found in the database'.format(uniq_municipality))
+            insuree_number = row['insuree_number']
+            if insuree_number not in insuree_no_seen:
+                insuree_no_seen.add(insuree_number)
 
-        village = row['village'].strip()
-        uniq_village = uniq_municipality + "|" + village
-        if uniq_village not in villages:
-            village_model = Location.objects.all().filter(validity_to__isnull=True,
-                                                          parent__id=municipalities[uniq_municipality]).filter(
-                get_location_str_filter(village)).first()
-            if village_model:
-                villages[uniq_village] = village_model.id
+            if insuree_number == row['head_insuree_number']:
+                head.append(True)
             else:
-                raise ValueError('Location {} not found in the database'.format(uniq_village))
+                head.append(False)
 
-        row['village'] = villages[uniq_village]
-        row['municipality'] = municipalities[uniq_municipality]
-        row['district'] = districts[uniq_district]
-        row['region'] = regions[uniq_region]
+    for index in sorted(empty_indices, reverse=True):
+        del dataset[index]
+
+    if len(insuree_no_seen) != len(dataset['insuree_number']):
+        raise ValueError('There are duplicates of insurance number in the list')
+
+    dataset.append_col(head, 'head')
+    dataset.append_col(villages_ids, 'village_id')
+    dataset.append_col(municipalities_ids, 'municipality_id')
+    dataset.append_col(districts_ids, 'district_id')
+    dataset.append_col(regions_ids, 'region_id')
 
 
 class InsureeResource(resources.ModelResource):
@@ -119,6 +138,7 @@ class InsureeResource(resources.ModelResource):
         attribute='family',
         column_name='head_insuree_number',
         widget=ForeignkeyRequiredWidget(Family, field='head_insuree__chf_id'),
+        readonly=True,
     )
 
     insuree_number = fields.Field(
@@ -139,19 +159,20 @@ class InsureeResource(resources.ModelResource):
     dob = fields.Field(
         attribute='dob',
         column_name='dob',
+        widget=widgets.DateWidget(format=ImportExportConfig.im_export_date_format)
     )
 
     sex = fields.Field(
         attribute='gender',
         column_name='sex',
-        widget=ForeignkeyRequiredWidget(Gender, field='gender'),
+        widget=ForeignkeyRequiredWidget(Gender, field='code'),
     )
 
-    # todo current_village vs family__location (current village is frequently NULL and possibly different than family__locaiton, family__locaiton is redundant for all non head insurees)
     village = fields.Field(
         attribute='current_village',
         column_name='village',
         widget=ForeignkeyRequiredWidget(Location, field='name'),
+        readonly=True
     )
 
     # readonly, just for export and import validation
@@ -178,42 +199,67 @@ class InsureeResource(resources.ModelResource):
         readonly=True
     )
 
-    def before_import(self, dataset, using_transactions, dry_run, **kwargs):
-        # removing the empty rows https://github.com/django-import-export/django-import-export/issues/1192#issue-718848641
-        remove_empty_lines(dataset)
-        # look for duplicates within the list
-        insuree_number_uniqueness(dataset)
-        # validate the location and replace rteference with location id
-        validate_location_inject_id(dataset)
+    def __init__(self, user, queryset=None, ):
+        """
+        @param user: User to be used for location rights for import and export, and for audit_user_id
+        @param queryset: Queryset to use for export, Default to full quetyset
+        """
+        super().__init__()
+        self._user = user
+        self._queryset = queryset
 
-    def before_import_row(self, row, row_number=None, **kwargs):
-        # todo not ready
-        # set is head if no head_insuree_number
-        row['card_issued'] = False
-        row['audit_user_id'] = 0
-        if row['head_insuree_number'] == row['insuree_number']:
-            row['head'] = True
-            row['family'] = None
-        else:
-            row['head'] = False
-            # get head
-            head = Insuree.objects.all().filter(validity_to__isnull=True).get(chf_id=row['head_insuree_number'])
-            row['family'] = head.family_id
-            # set family id if not head
+    @classmethod
+    def validate_and_sort_dataset(cls, dataset):
+        validate_and_preprocess(dataset)
+        return dataset.sort('head', reverse=True)
 
-    def after_import_instance(self, instance, new, row_number=None, **kwargs):
-        # todo untested
-        # if head create family
+    def after_import_instance(self, instance, new, **kwargs):
+        # for now editing is disabled
+        if not new:
+            raise ValueError("Insuree number already exists")
+
+    def import_obj(self, instance, row, dry_run, **kwargs):
+        instance.head = row['head']
+        instance.current_village_id = row['village_id']
+
+        if not instance.id:
+            instance.card_issued = False
+            instance.audit_user_id = self._user.id
+
+        if not instance.head:
+            family = Family.objects.all().filter(validity_to__isnull=True) \
+                .select_related('location') \
+                .get(head_insuree__chf_id=row['head_insuree_number'])
+            instance.family = family
+            family_location = family.location
+            # if the current village is the same as head's, skip the current_location
+            if family_location.id == row['village_id']:
+                instance.current_village_id = None
+
+        # important to be at the end
+        super().import_obj(instance, row, dry_run, **kwargs)
+
+    def after_save_instance(self, instance, using_transactions, dry_run):
+        super().after_save_instance(instance, using_transactions, dry_run)
         if instance.head:
-            # create family
-            data = {'head_insuree': instance.chf_id, 'location': instance.current_village}
-            instance.family = FamilyService(InteractiveUser.objects.get(login_name='Admin')).create_or_update(data)
-            # update family id
-            instance.save()
+            # if not using_transactions and dry_run this code will cause changes in database on dry run
+            if using_transactions or not dry_run:
+                instance.family = self.create_family(instance)
+                instance.current_village = None
+                instance.save()
+
+    def create_family(self, instance):
+        return Family.objects.create(**{
+            'validity_from': datetime.now(),
+            'audit_user_id': self._user.id,
+            'head_insuree': instance,
+            'location': instance.current_village,
+            'is_offline': False,
+        })
 
     def get_queryset(self):
-        # TODO add location based filtering (possibly push current user to InsureeResource.__init__)
-        return super().get_queryset() \
+        queryset = self._queryset if self._queryset else super().get_queryset()
+        return queryset \
             .filter(validity_to__isnull=True) \
             .select_related('gender', 'current_village', 'family', 'family__location', 'family__location__parent',
                             'family__location__parent__parent', 'family__location__parent__parent__parent')

@@ -1,14 +1,8 @@
-import json
 import os
-
 from tablib import Dataset
-
 from im_export.resources import InsureeResource
-
-from core.services import (create_or_update_core_user,
-                           create_or_update_interactive_user)
-from django.test import TestCase, TransactionTestCase
-from insuree.models import Family, Insuree
+from core.services import create_or_update_core_user, create_or_update_interactive_user
+from django.test import TestCase
 from location.test_helpers import create_test_location
 
 _TEST_USER_NAME = "test_insuree_import"
@@ -49,10 +43,10 @@ class ImportInsureeTest(TestCase):
     def setUp(self) -> None:
 
         super(ImportInsureeTest, self).setUp()
-        i_user, i_user_created = create_or_update_interactive_user(
+        self.i_user, i_user_created = create_or_update_interactive_user(
             user_id=None, data=_TEST_DATA_USER, audit_user_id=999, connected=False)
         user, user_created = create_or_update_core_user(
-            user_uuid=None, username=_TEST_DATA_USER["username"], i_user=i_user)
+            user_uuid=None, username=_TEST_DATA_USER["username"], i_user=self.i_user)
         self.user = user
         test_location = _TEST_LOCATIONS
 
@@ -87,15 +81,18 @@ class ImportInsureeTest(TestCase):
 
     def test_simple_import(self):
         dir_path = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
+        resource = InsureeResource(user=self.i_user)
         with open(os.path.join(dir_path, 'tests/import_example.csv'), 'r') as f:
-            imported_data = Dataset(headers=InsureeResource.insuree_headers).load(f.read())
-            imported_data = imported_data.sort('head_insuree_number')
-            result = InsureeResource().import_data(
-                imported_data, dry_run=True, use_transactions=False,
+            imported_data = resource \
+                .validate_and_sort_dataset(Dataset(headers=InsureeResource.insuree_headers).load(f.read()))
+            result = resource.import_data(
+                imported_data, dry_run=True, use_transactions=True,
                 collect_failed_rows=False,
             )
             self.assertEqual(result.has_errors(), False)
 
-    def test_simple_import(self):
-        result = InsureeResource().export().dict
+    def test_simple_export(self):
+        result = InsureeResource(self.i_user).export().dict
         self.assertTrue(result)
+
+# todo expand tests
