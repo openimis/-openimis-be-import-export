@@ -41,9 +41,8 @@ class ImportInsureeTest(TestCase):
         super(ImportInsureeTest, self).setUp()
         self.i_user, i_user_created = create_or_update_interactive_user(
             user_id=None, data=_TEST_DATA_USER, audit_user_id=999, connected=False)
-        user, user_created = create_or_update_core_user(
+        self.user, user_created = create_or_update_core_user(
             user_uuid=None, username=_TEST_DATA_USER["username"], i_user=self.i_user)
-        self.user = user
         test_location = _TEST_LOCATIONS
 
         for locations in test_location:
@@ -57,7 +56,7 @@ class ImportInsureeTest(TestCase):
 
     def test_simple_import(self):
         dir_path = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
-        resource = InsureeResource(user=self.i_user)
+        resource = InsureeResource(user=self.user)
         with open(os.path.join(dir_path, 'tests/import_example.csv'), 'r') as f:
             imported_data = resource \
                 .validate_and_sort_dataset(Dataset(headers=InsureeResource.insuree_headers).load(f.read()))
@@ -68,7 +67,7 @@ class ImportInsureeTest(TestCase):
             self.assertEqual(result.has_errors(), False)
 
     def test_simple_export(self):
-        result = InsureeResource(self.i_user).export().dict
+        result = InsureeResource(self.user).export().dict
         self.assertTrue(result)
 
 # todo expand tests
