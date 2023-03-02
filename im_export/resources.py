@@ -224,7 +224,7 @@ class InsureeResource(resources.ModelResource):
 
         if not instance.id:
             instance.card_issued = False
-            instance.audit_user_id = self._user.id
+            instance.audit_user_id = self._user.i_user.id
 
         if not instance.head:
             family = Family.objects.all().filter(validity_to__isnull=True) \
@@ -251,7 +251,7 @@ class InsureeResource(resources.ModelResource):
     def create_family(self, instance):
         return Family.objects.create(**{
             'validity_from': datetime.now(),
-            'audit_user_id': self._user.id,
+            'audit_user_id': self._user.i_user.id,
             'head_insuree': instance,
             'location': instance.current_village,
             'is_offline': False,
