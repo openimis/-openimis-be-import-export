@@ -16,19 +16,17 @@ class InsureeImportExportService:
     }
 
     class Strategy:
-        INSERT = 'insert'
+        INSERT = 'INSERT'
+        UPDATE = 'UPDATE'
+        INSERT_UPDATE = "INSERT_UPDATE"
 
-    supported_strategies = (Strategy.INSERT,)
+    supported_strategies = (Strategy.INSERT, Strategy.UPDATE, Strategy.INSERT_UPDATE)
 
     def __init__(self, user):
         self._user = user
         self._resource = InsureeResource(user)
 
     def export_insurees(self, export_format: str = 'csv') -> Tuple[str, Any]:
-        '''
-        @param export_format: export format, must be one of the keys of supported_content_types
-        @return: Tuple of content type for a given format and the export in given format
-        '''
         if export_format not in self.supported_content_types:
             raise ValueError(f'Non-supported export format: {export_format}')
 
@@ -42,6 +40,11 @@ class InsureeImportExportService:
             raise ValueError(f'Missing import file')
         if strategy not in self.supported_strategies:
             raise ValueError(f'Non-supported strategy: {strategy}')
+
+        # Other strategies are not suppported for now
+        if strategy in (InsureeImportExportService.Strategy.UPDATE, InsureeImportExportService.Strategy.INSERT_UPDATE):
+            strategy = InsureeImportExportService.Strategy.INSERT
+            logger.warning(f'Strategy {strategy} not currently supported, defaulting to {InsureeImportExportService.Strategy.INSERT}')
 
         try:
             data_set = Dataset(headers=InsureeResource.insuree_headers).load(import_file.read().decode())

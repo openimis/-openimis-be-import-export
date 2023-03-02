@@ -1,3 +1,4 @@
+import json
 import logging
 from django.http import HttpResponse, JsonResponse
 from rest_framework.decorators import api_view, permission_classes
@@ -20,17 +21,12 @@ def check_user_rights(rights):
 @api_view(["POST"])
 @permission_classes([check_user_rights(InsureeConfig.gql_mutation_create_insurees_perms, )])
 def import_insurees(request):
-    import_file = request.FILES.get('file', None)
-
-    # For now strategy and dry_run is ignored, default "insert" and False
-    # dry_run = request.FILES.get('dry_run', None)
-    # strategy = request.FILES.get('file', None)
-
-    dry_run = False
-    strategy = InsureeImportExportService.Strategy.INSERT
-    user = request.user
-
     try:
+        import_file = request.FILES.get('file', None)
+        user = request.user
+        dry_run = json.loads(request.POST.get('dry_run', 'false'))
+        strategy = request.POST.get('strategy', InsureeImportExportService.Strategy.INSERT)
+
         success, totals, errors = InsureeImportExportService(user) \
             .import_insurees(import_file, dry_run=dry_run, strategy=strategy)
         return JsonResponse(data={'success': success, 'data': totals, 'errors': errors})
@@ -45,11 +41,11 @@ def import_insurees(request):
 @api_view(["GET"])
 @permission_classes([check_user_rights(InsureeConfig.gql_query_insurees_perms, )])
 def export_insurees(request):
-    # TODO add location based filtering
-    export_format = request.GET.get("file_format", "csv")
-    user = request.user
-
     try:
+        # TODO add location based filtering
+        export_format = request.GET.get("file_format", "csv")
+        user = request.user
+
         content_type, export = InsureeImportExportService(user).export_insurees(export_format)
         response = HttpResponse(export, content_type=content_type)
         response['Content-Disposition'] = f'attachment; filename="insurees.{export_format}"'
