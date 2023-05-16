@@ -36,10 +36,12 @@ class InsureeImportExportService:
 
     def import_insurees(self, import_file, dry_run: bool = False, strategy: str = Strategy.INSERT) \
             -> Tuple[bool, Dict[str, int], List[str]]:
+
         if not import_file:
-            raise ValueError(f'Missing import file')
+            return self._get_general_error('Missing import file')
         if strategy not in self.supported_strategies:
-            raise ValueError(f'Non-supported strategy: {strategy}')
+            return self._get_general_error(f'Non-supported strategy: {strategy}')
+
 
         # Other strategies are not suppported for now
         if strategy in (InsureeImportExportService.Strategy.UPDATE, InsureeImportExportService.Strategy.INSERT_UPDATE):
@@ -49,9 +51,14 @@ class InsureeImportExportService:
         try:
             data_set = Dataset(headers=InsureeResource.insuree_headers).load(import_file.read().decode())
         except Exception as e:
-            raise ValueError('Failed to parse input file') from e
+            return self._get_general_error('Failed to parse input file',e)
 
-        data_set = self._resource.validate_and_sort_dataset(data_set)
+
+ 
+        try:
+            data_set = self._resource.validate_and_sort_dataset(data_set)
+        except Exception as e:
+            return self._get_general_error('file validation failed',e)    
 
         dry_run_result = self._resource.import_data(data_set, dry_run=True)  # Test the data import
         totals = self._get_totals_from_result(dry_run_result)
@@ -78,6 +85,17 @@ class InsureeImportExportService:
             'invalid': result.totals['invalid'],
             'failed': result.totals['error']
         }
+        
+    @staticmethod
+    def _get_general_error(*args):
+        errors = []
+        for arg in args:
+            errors.append( arg.message if hasattr(arg, 'message') else str(arg))
+        totals = {'sent': 0,'created': 0,'updated': 0,'deleted': 0,'skipped': 0,'invalid': 0,'failed': 0}
+        success = False
+
+        return success,totals, errors
+  
 
     @staticmethod
     def _get_errors_from_result(result):
