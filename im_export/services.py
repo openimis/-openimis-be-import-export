@@ -84,7 +84,7 @@ class InsureeImportExportService:
         errors = []
         if result.has_validation_errors():
             for invalid_row in result.invalid_rows:
-                errors.append(f"row ({invalid_row.number}) - {invalid_row.error.message}")
+                errors.append(f"row ({invalid_row.number}) - {invalid_row.error.messages}")
         if result.has_errors():
             for index, row_error in result.row_errors():
                 for error in row_error:
