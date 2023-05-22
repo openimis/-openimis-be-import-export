@@ -42,23 +42,27 @@ class InsureeImportExportService:
         if strategy not in self.supported_strategies:
             return self._get_general_error(f'Non-supported strategy: {strategy}')
 
-
-        # Other strategies are not suppported for now
+        # Other strategies are not supported for now
         if strategy in (InsureeImportExportService.Strategy.UPDATE, InsureeImportExportService.Strategy.INSERT_UPDATE):
             strategy = InsureeImportExportService.Strategy.INSERT
             logger.warning(f'Strategy {strategy} not currently supported, defaulting to {InsureeImportExportService.Strategy.INSERT}')
 
         try:
-            data_set = Dataset(headers=InsureeResource.insuree_headers).load(import_file.read().decode())
+            if import_file.content_type == 'application/vnd.ms-excel':
+                data_set = Dataset(headers=InsureeResource.insuree_headers).load(import_file.open(), 'xls')
+            elif import_file.content_type == 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet':
+                data_set = Dataset(headers=InsureeResource.insuree_headers).load(import_file.open(), 'xlsx')
+            elif import_file.content_type == 'application/json':
+                data_set = Dataset(headers=InsureeResource.insuree_headers).load(import_file.open())
+            else:
+                data_set = Dataset(headers=InsureeResource.insuree_headers).load(import_file.read().decode())
         except Exception as e:
-            return self._get_general_error('Failed to parse input file',e)
+            return self._get_general_error('Failed to parse input file', e)
 
-
- 
         try:
             data_set = self._resource.validate_and_sort_dataset(data_set)
         except Exception as e:
-            return self._get_general_error('file validation failed',e)    
+            return self._get_general_error('file validation failed', e)
 
         dry_run_result = self._resource.import_data(data_set, dry_run=True)  # Test the data import
         totals = self._get_totals_from_result(dry_run_result)
@@ -90,12 +94,11 @@ class InsureeImportExportService:
     def _get_general_error(*args):
         errors = []
         for arg in args:
-            errors.append( arg.message if hasattr(arg, 'message') else str(arg))
-        totals = {'sent': 0,'created': 0,'updated': 0,'deleted': 0,'skipped': 0,'invalid': 0,'failed': 0}
+            errors.append(arg.message if hasattr(arg, 'message') else str(arg))
+        totals = {'sent': 0, 'created': 0, 'updated': 0, 'deleted': 0, 'skipped': 0, 'invalid': 0, 'failed': 0}
         success = False
 
-        return success,totals, errors
-  
+        return success, totals, errors
 
     @staticmethod
     def _get_errors_from_result(result):
