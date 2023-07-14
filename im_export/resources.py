@@ -96,7 +96,7 @@ def validate_and_preprocess(dataset):
 
     for idx, row in enumerate(dataset.dict):
 
-        row_str = ''.join([str(col or '') for col in row])
+        row_str = ''.join([str(col or '') for col in row.values()])
         if row_str.strip() == '':
             empty_indices.append(idx)
         else:
