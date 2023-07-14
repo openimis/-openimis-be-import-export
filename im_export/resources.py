@@ -30,7 +30,7 @@ def get_location_str_filter(str):
 
 
 def get_locations_ids(row, regions, districts, municipalities, villages):
-    uniq_region = row['region'].strip()
+    uniq_region = str(row['region'] or '').strip()
     if uniq_region not in regions:
         region_model = Location.objects.all().filter(validity_to__isnull=True) \
             .filter(get_location_str_filter(uniq_region)).first()
@@ -39,7 +39,7 @@ def get_locations_ids(row, regions, districts, municipalities, villages):
         else:
             raise ValueError('Location {} not found in the database'.format(uniq_region))
 
-    district = row['district'].strip()
+    district = str(row['district'] or '').strip()
     uniq_district = uniq_region + "|" + district
     if uniq_district not in districts:
         district_model = Location.objects.all() \
@@ -50,7 +50,7 @@ def get_locations_ids(row, regions, districts, municipalities, villages):
         else:
             raise ValueError('Location {} not found in the database'.format(uniq_district))
 
-    municipality = row['municipality'].strip()
+    municipality = str(row['municipality'] or '').strip()
     uniq_municipality = uniq_district + "|" + municipality
     if uniq_municipality not in municipalities:
         municipality_model = Location.objects.all() \
@@ -61,7 +61,7 @@ def get_locations_ids(row, regions, districts, municipalities, villages):
         else:
             raise ValueError('Location {} not found in the database'.format(uniq_municipality))
 
-    village = row['village'].strip()
+    village = str(row['village'] or '').strip()
     uniq_village = uniq_municipality + "|" + village
     if uniq_village not in villages:
         village_model = Location.objects.all() \
