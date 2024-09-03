@@ -4,7 +4,7 @@ from im_export.resources import InsureeResource
 from core.services import create_or_update_core_user, create_or_update_interactive_user
 from django.test import TestCase
 from location.test_helpers import create_test_location
-
+from django.conf import settings
 _TEST_USER_NAME = "test_insuree_import"
 _TEST_USER_PWD = "test_insuree_import"
 _TEST_DATA_USER = {
@@ -70,4 +70,3 @@ class ImportInsureeTest(TestCase):
         result = InsureeResource(self.user).export().dict
         self.assertTrue(result)
 
-# todo expand tests
