@@ -43,7 +43,7 @@ def get_locations_ids(row, regions, districts, municipalities, villages):
     uniq_district = uniq_region + "|" + district
     if uniq_district not in districts:
         district_model = Location.objects.all() \
-            .filter(validity_to__isnull=True, parent__id=regions[uniq_region]) \
+            .filter(validity_to__isnull=True, parent_id=regions[uniq_region]) \
             .filter(get_location_str_filter(district)).first()
         if district_model:
             districts[uniq_district] = district_model.id
@@ -54,7 +54,7 @@ def get_locations_ids(row, regions, districts, municipalities, villages):
     uniq_municipality = uniq_district + "|" + municipality
     if uniq_municipality not in municipalities:
         municipality_model = Location.objects.all() \
-            .filter(validity_to__isnull=True, parent__id=districts[uniq_district]) \
+            .filter(validity_to__isnull=True, parent_id=districts[uniq_district]) \
             .filter(get_location_str_filter(municipality)).first()
         if municipality_model:
             municipalities[uniq_municipality] = municipality_model.id
@@ -65,7 +65,7 @@ def get_locations_ids(row, regions, districts, municipalities, villages):
     uniq_village = uniq_municipality + "|" + village
     if uniq_village not in villages:
         village_model = Location.objects.all() \
-            .filter(validity_to__isnull=True, parent__id=municipalities[uniq_municipality]) \
+            .filter(validity_to__isnull=True, parent_id=municipalities[uniq_municipality]) \
             .filter(get_location_str_filter(village)).first()
         if village_model:
             villages[uniq_village] = village_model.id
@@ -94,8 +94,8 @@ def validate_and_preprocess(dataset):
 
     insuree_no_seen = set()
 
-    for idx, row in enumerate(dataset.dict):
-
+    # we don't process 
+    for idx, row in enumerate(dataset.dict, start=1):
         row_str = ''.join([str(col or '') for col in row])
         if row_str.strip() == '':
             empty_indices.append(idx)
