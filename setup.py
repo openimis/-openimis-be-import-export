@@ -24,6 +24,9 @@ setup(
         'django-import-export',
         'tablib',
         'django-import-export[xlsx]',
+        'tablib[xls]',
+        'xlrd',
+        'xlwt', 
     ],
     classifiers=[
         'Environment :: Web Environment',
