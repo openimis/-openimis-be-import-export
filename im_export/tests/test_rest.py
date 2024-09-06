@@ -7,7 +7,7 @@ from graphql_jwt.shortcuts import get_token
 from core.models import User
 from django.conf import settings
 from django.db import connection
-
+import json
 
 @dataclass
 class DummyContext:
@@ -35,6 +35,7 @@ class ReportAPITests( APITestCase):
         URL = f'/{settings.SITE_ROOT()}im_export/exports/insurees?file_format=xls'
         headers = {"HTTP_AUTHORIZATION": f"Bearer {self.admin_token}"}
         response = self.client.get(URL, format='json', **headers)
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        error = str(response.content) if response.status_code != status.HTTP_200_OK else ""
+        self.assertEqual(response.status_code, status.HTTP_200_OK, error)
 
 # todo expand tests
