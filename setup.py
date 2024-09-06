@@ -23,6 +23,7 @@ setup(
         'django',
         'django-import-export',
         'tablib',
+        'django-import-export[xlsx]',
     ],
     classifiers=[
         'Environment :: Web Environment',
